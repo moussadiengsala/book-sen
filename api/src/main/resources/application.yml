@@ -1,6 +1,7 @@
 spring:
   application:
     name: book-sen-api
+
   data:
     mongodb:
       auto-index-creation: true

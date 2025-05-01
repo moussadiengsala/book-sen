@@ -1,95 +1,122 @@
-"use client"
-
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useNavigate } from "react-router"
-import type { User } from "../types"
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useNavigate } from 'react-router';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { login, register, getCurrentUser, logout as logoutService, updateUser } from '../lib/auth-service';
+import type { User, LoginUser, CreateUser, UpdateUser } from '../types';
+import { environment } from './environment';
 
 type AuthContextType = {
-  user: User | null
-  login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string, role: string) => Promise<void>
-  logout: () => void
-  isLoading: boolean
-}
+  user: User | null;
+  login: (credentials: LoginUser) => Promise<void>;
+  register: (data: CreateUser) => Promise<void>;
+  updateProfile: (data: UpdateUser) => Promise<void>;
+  logout: () => void;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+};
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const navigate = useNavigate()
+  const [user, setUser] = useState<User | null>(null);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-    setIsLoading(false)
-  }, [])
-
-  const login = async (email: string, password: string) => {
-    setIsLoading(true)
-    try {
-      // Mock login - in a real app, this would be an API call
-      const mockUsers = [
-        { id: "1", name: "Admin User", email: "admin@example.com", password: "password", role: "admin" },
-        { id: "2", name: "Regular User", email: "user@example.com", password: "password", role: "user" },
-      ]
-
-      const user = mockUsers.find((u) => u.email === email && u.password === password)
-
-      if (!user) {
-        throw new Error("Invalid credentials")
+    const initializeUser = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Failed to initialize user:', error);
+        localStorage.removeItem(environment.SESSION_STORAGE);
+        setUser(null);
       }
+    };
 
-      const { password: _, ...userWithoutPassword } = user
-      setUser(userWithoutPassword as User)
-      localStorage.setItem("user", JSON.stringify(userWithoutPassword))
-      navigate("/dashboard")
-    } catch (error) {
-      console.error("Login failed:", error)
-      throw error
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    initializeUser();
+  }, []);
 
-  const register = async (name: string, email: string, password: string, role: string) => {
-    setIsLoading(true)
-    try {
-      // Mock registration - in a real app, this would be an API call
-      const newUser: User = {
-        id: Math.random().toString(36).substr(2, 9),
-        name,
-        email,
-        role: "user", // Default to user role
-      }
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: login,
+    onSuccess: (userData) => {
+      setUser(userData);
+      queryClient.setQueryData(['auth', 'me'], userData);
+      navigate('/dashboard');
+    },
+  });
 
-      setUser(newUser)
-      localStorage.setItem("user", JSON.stringify(newUser))
-      navigate("/dashboard")
-    } catch (error) {
-      console.error("Registration failed:", error)
-      throw error
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  // Register mutation
+  const registerMutation = useMutation({
+    mutationFn: register,
+    onSuccess: (userData) => {
+      setUser(userData);
+      queryClient.setQueryData(['auth', 'me'], userData);
+      navigate('/dashboard');
+    },
+  });
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem("user")
-    navigate("/login")
-  }
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: UpdateUser) => {
+      if (!user) throw new Error('User not authenticated');
+      return updateUser(user.id, data);
+    },
+    onSuccess: (updatedUser) => {
+      setUser(updatedUser);
+      queryClient.setQueryData(['auth', 'me'], updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    },
+  });
 
-  return <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>{children}</AuthContext.Provider>
+  // Login function
+  const handleLogin = async (credentials: LoginUser) => {
+    await loginMutation.mutateAsync(credentials);
+  };
+
+  // Register function
+  const handleRegister = async (data: CreateUser) => {
+    await registerMutation.mutateAsync(data);
+  };
+
+  // Update profile function
+  const handleUpdateProfile = async (data: UpdateUser) => {
+    await updateProfileMutation.mutateAsync(data);
+  };
+
+  // Logout function
+  const handleLogout = () => {
+    logoutService();
+    setUser(null);
+    queryClient.clear(); // Clear all queries
+    navigate('/login');
+  };
+
+  const isLoading = loginMutation.isPending || registerMutation.isPending || updateProfileMutation.isPending;
+  const isAuthenticated = !!user;
+
+  return (
+      <AuthContext.Provider
+          value={{
+            user,
+            login: handleLogin,
+            register: handleRegister,
+            updateProfile: handleUpdateProfile,
+            logout: handleLogout,
+            isLoading,
+            isAuthenticated,
+          }}
+      >
+        {children}
+      </AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error('useAuth must be used within an AuthProvider');
   }
-  return context
-}
+  return context;
+};

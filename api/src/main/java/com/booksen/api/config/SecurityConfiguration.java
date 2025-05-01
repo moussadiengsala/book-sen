@@ -30,6 +30,7 @@ public class SecurityConfiguration {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
     private final JwtDecoder jwtDecoder;
+    private final CustomCorsConfiguration customCorsConfiguration;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -37,11 +38,12 @@ public class SecurityConfiguration {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(req ->
                         req
-                                .requestMatchers(new String[]{"/api/v1/users/auth/**", "/api/v1/users/avatar/**"}).permitAll()
-                                .requestMatchers("/api/v1/users/admin/**").hasRole("SUPER_ADMIN")
+                                .requestMatchers(new String[]{"/api/v1/user/auth/**", "/api/v1/user/avatar/**"}).permitAll()
+                                .requestMatchers("/api/v1/user/admin/**").hasRole("ADMIN")
                                 .anyRequest()
                                 .authenticated()
                 )
+                .cors(c -> c.configurationSource(customCorsConfiguration))
 //                .exceptionHandling(ex -> ex.accessDeniedHandler(accessDeniedHandler))
                 // This line configures how the session is managed in your application.
                 // SessionCreationPolicy.STATELESS: This means that the application will not create or use an HTTP session to store the user's security context.

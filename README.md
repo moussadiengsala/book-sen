@@ -131,6 +131,6 @@ Un compte administrateur est automatiquement créé au premier démarrage:
 ## Demo
 
 <video width="600" controls>
-  <source src="front-end/public/demo/demo.webm" type="video/mp4">
+  <source src="assets/demo/demo.webm" type="video/webm">
   Your browser does not support the video tag.
 </video>

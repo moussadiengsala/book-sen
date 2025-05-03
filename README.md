@@ -130,7 +130,5 @@ Un compte administrateur est automatiquement créé au premier démarrage:
 
 ## Demo
 
-<video width="600" controls>
-  <source src="https://github.com/moussadiengsala/book-sen/main/assets/demo.webm" type="video/webm">
-  Your browser does not support the video tag.
-</video>
+[Watch Demo](https://drive.google.com/file/d/1RsHYtDM2vK_HukU4sBVEWdei1xQNpoTf/view?usp=sharing)
+

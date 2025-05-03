@@ -14,7 +14,6 @@ import {environment} from "../lib/environment";
 import {AxiosError} from "axios";
 import {registerSchema} from "../lib/schema";
 
-
 type RegisterFormValues = z.infer<typeof registerSchema>
 
 type RegisterToast = {

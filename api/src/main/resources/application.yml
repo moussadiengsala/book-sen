@@ -13,9 +13,9 @@ spring:
       host: localhost
   jpa:
     hibernate:
-      ddl-auto: update  # Automatically update schema (you can use 'create' or 'validate' if needed)
-    show-sql: true  # Show SQL statements for debugging
-    open-in-view: false  # Disable open-in-view to prevent lazy loading outside of transactions
+      ddl-auto: create
+    show-sql: true
+    open-in-view: false
 
 server:
   port: 8082
@@ -24,7 +24,7 @@ application:
   security:
     jwt:
       key-id: book-sen-secret-key
-      expiration: 86400000 # 1 day
+      expiration: 86400000
 
   media:
     upload:

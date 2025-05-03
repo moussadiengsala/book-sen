@@ -80,24 +80,25 @@ public class BooksHelper {
     public Response<Object> updateEntity(Books entity, CreateUpdateBookDTO updateDTO) {
         boolean isUpdated = false;
 
-        if (updateDTO.getName() != null && !updateDTO.getName().isEmpty()) {
+        if (updateDTO.getName() != null) {
             entity.setName(updateDTO.getName());
             isUpdated = true;
         }
 
-        if (updateDTO.getDescription() != null && !updateDTO.getDescription().isEmpty()) {
+        if (updateDTO.getDescription() != null) {
             entity.setDescription(updateDTO.getDescription());
             isUpdated = true;
         }
 
-        if (updateDTO.getCover() != null && !updateDTO.getCover().isEmpty()) {
-            Response<Object> response = this.processCover(updateDTO.getCover());
-            if (response.getData() != null) return response;
 
+        if (updateDTO.getCover() != null) {
+            Response<Object> response = this.processCover(updateDTO.getCover());
+            if (response.getStatus() != HttpStatus.OK.value()) return response;
             try {
+
                 if (entity.getCover() != null) {
                     Response<Object> responseDeleted = fileServices.deleteOldImage(entity.getCover());
-                    if (responseDeleted.getStatus() != HttpStatus.OK.value()) return responseDeleted;
+                    if (responseDeleted != null) return responseDeleted;
                 }
 
                 // Set the new avatar URL

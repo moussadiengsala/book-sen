@@ -39,7 +39,6 @@ public class BooksController {
     @GetMapping("/cover/{filename}")
     public ResponseEntity<Object> getCoverBook(@PathVariable String filename) {
         Response<Object> response = booksService.getBookCover(filename);
-        System.out.println(response);
         if (response.getStatus() != HttpStatus.OK.value()) {
             return ResponseEntity.status(response.getStatus()).body(response);
         }

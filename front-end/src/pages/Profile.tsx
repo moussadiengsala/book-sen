@@ -99,6 +99,7 @@ export default function ProfilePage() {
       await updateProfile(userData);
       setLog({message: "Information has been updated successfully", isError: false})
     } catch (error) {
+      console.log(error)
       const axiosError = error as AxiosError<{ message?: string }>;
       const message =
           axiosError.response?.data?.message ||
@@ -140,15 +141,15 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="currentPassword">Password</Label>
-                <Input id="currentPassword" type="currentPassword" placeholder="Enter your password" {...form.register("currentPassword")} />
+                <Label htmlFor="currentPassword">Current Password</Label>
+                <Input id="currentPassword" type="password" placeholder="Enter your password" {...form.register("currentPassword")} />
                 {form.formState.errors.currentPassword && (
                     <p className="text-sm text-red-500 text-left">{form.formState.errors.currentPassword.message}</p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="newPassword">Password</Label>
-                <Input id="newPassword" type="newPassword" placeholder="Enter your password" {...form.register("currentPassword")} />
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input id="newPassword" type="password" placeholder="Enter your password" {...form.register("newPassword")} />
                 {form.formState.errors.newPassword && (
                     <p className="text-sm text-red-500 text-left">{form.formState.errors.newPassword.message}</p>
                 )}

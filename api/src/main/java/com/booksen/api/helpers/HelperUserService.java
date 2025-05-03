@@ -107,12 +107,13 @@ public class HelperUserService {
             try {
                 if (entity.getAvatar() != null) {
                     Response<Object> responseDeleted = fileServices.deleteOldImage(entity.getAvatar());
-                    if (responseDeleted.getStatus() != HttpStatus.OK.value()) return responseDeleted;
+                    if (responseDeleted != null) return responseDeleted;
                 }
 
                 // Set the new avatar URL
                 String avatarUrl = (String) response.getData();
                 entity.setAvatar(avatarUrl);
+
             } catch (IOException e) {
                 return new Response<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to process avatar", null);
             }

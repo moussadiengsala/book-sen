@@ -128,10 +128,9 @@ Un compte administrateur est automatiquement créé au premier démarrage:
 - `/books/:id/edit` : Édition (admin)
 - `/profile` : Profil utilisateur (protégée)
 
-## Contribution
+## Demo
 
-Les contributions sont les bienvenues! Veuillez soumettre des pull requests ou signaler des problèmes via GitHub.
-
-## Licence
-
-[Insérer information de licence ici]
+<video width="600" controls>
+  <source src="front-end/public/demo/demo.webm" type="video/mp4">
+  Your browser does not support the video tag.
+</video>

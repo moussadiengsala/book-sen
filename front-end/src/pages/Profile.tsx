@@ -1,139 +1,206 @@
 "use client"
 
-import { useState } from "react"
+import {useEffect, useState} from "react"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "../components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form"
+import { Card, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
+import { Form } from "../components/ui/form"
 import { Input } from "../components/ui/input"
 import { useAuth } from "../lib/auth-provider"
-import { useToast } from "../hooks/use-toast"
+import {Label} from "../components/ui/label";
+import {updateUserSchema} from "../lib/schema";
+import {environment} from "../lib/environment";
+import {AxiosError} from "axios";
+import Alert from "../components/Alert";
+import {X} from "lucide-react";
+import {UpdateUser} from "../types";
 
-const profileFormSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email"),
-})
 
-type ProfileFormValues = z.infer<typeof profileFormSchema>
+type ProfileFormValues = z.infer<typeof updateUserSchema>
+
+type ProcessInformation = {
+  isError: boolean;
+  message: string
+}
 
 export default function ProfilePage() {
-  const { user } = useAuth()
-  const { showToast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
+  const {updateProfile} = useAuth()
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [log, setLog] = useState<ProcessInformation | null>(null)
 
   const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues: {
-      name: user?.name || "",
-      email: user?.email || "",
-    },
+    resolver: zodResolver(updateUserSchema),
   })
 
-  const onSubmit = (data: ProfileFormValues) => {
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileInput = e.target;
+    if (fileInput.files && fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+
+      // Check file type
+      if (!environment.ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        form.setError("avatar", {
+          type: "manual",
+          message: "Only .jpg, .jpeg, .png and .webp formats are supported"
+        });
+        setAvatarPreview(null);
+        return;
+      }
+
+      // Check file size
+      if (file.size > environment.MAX_FILE_SIZE) {
+        form.setError("avatar", {
+          type: "manual",
+          message: "Max file size is 2MB"
+        });
+        setAvatarPreview(null);
+        return;
+      }
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (typeof result === "string") {
+          setAvatarPreview(result);
+        }
+      };
+      reader.readAsDataURL(file);
+
+      // Clear any previous errors
+      form.clearErrors("avatar");
+    } else {
+      setAvatarPreview(null);
+    }
+  };
+
+  // Clean up object URLs to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (avatarPreview && avatarPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, []);
+
+  const onSubmit = async (data: ProfileFormValues) => {
     setIsLoading(true)
+    try {
+      const userData: UpdateUser = {
+        name: data.name,
+        current_password: data.currentPassword,
+        new_password: data.newPassword,
+        avatar: data.avatar
+      };
 
-    // In a real app, this would be an API call to update the user profile
-    setTimeout(() => {
-      showToast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully",
-      })
-      setIsLoading(false)
-    }, 1000)
-  }
-
-  if (!user) {
-    return <div>Loading...</div>
-  }
+      await updateProfile(userData);
+      setLog({message: "Information has been updated successfully", isError: false})
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      const message =
+          axiosError.response?.data?.message ||
+          axiosError.message ||
+          "Something went wrong while processing your request.";
+      setLog({message, isError: true})
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div>
+      {log &&
+          <div className="fixed bottom-4 right-4 z-50">
+            <Alert message={log.message} type={log.isError ? "error" : "success"} icon={X} />
+          </div>
+      }
+      <div className="text-left">
         <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
         <p className="text-muted-foreground">Manage your account settings</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+      <div className="">
+        <Card className="p-4">
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
             <CardDescription>Update your personal details</CardDescription>
           </CardHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+            <form onSubmit={form.handleSubmit((data) => onSubmit(data))} className="space-y-8">
+
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" placeholder="Enter your name" {...form.register("name")} />
+                {form.formState.errors.name && (
+                    <p className="text-sm text-red-500 text-left">{form.formState.errors.name.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Password</Label>
+                <Input id="currentPassword" type="currentPassword" placeholder="Enter your password" {...form.register("currentPassword")} />
+                {form.formState.errors.currentPassword && (
+                    <p className="text-sm text-red-500 text-left">{form.formState.errors.currentPassword.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Password</Label>
+                <Input id="newPassword" type="newPassword" placeholder="Enter your password" {...form.register("currentPassword")} />
+                {form.formState.errors.newPassword && (
+                    <p className="text-sm text-red-500 text-left">{form.formState.errors.newPassword.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirm your password"
+                    {...form.register("confirmPassword")}
                 />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                {form.formState.errors.confirmPassword && (
+                    <p className="text-sm text-red-500 text-left">{form.formState.errors.confirmPassword.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="avatar">Profile Picture (Optional)</Label>
+                <Input
+                    id="avatar"
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    {...form.register("avatar", {
+                      onChange: handleAvatarChange
+                    })}
                 />
-                <div>
-                  <FormLabel>Role</FormLabel>
-                  <div className="mt-1 rounded-md border p-3 text-sm capitalize">{user.role}</div>
-                  <FormDescription>Your role determines your access level in the system</FormDescription>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "Saving..." : "Save Changes"}
-                </Button>
-              </CardFooter>
+                {form.formState.errors.avatar && (
+                    <p className="text-sm text-red-500 text-left">{form.formState.errors.avatar.message?.toString()}</p>
+                )}
+
+                {/* Avatar Preview */}
+                {avatarPreview && (
+                    <div className="mt-2 flex justify-center">
+                      <div className="relative w-24 h-24 overflow-hidden rounded-full border-2 border-gray-200">
+                        <img
+                            src={avatarPreview}
+                            alt="Avatar preview"
+                            className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </div>
+                )}
+              </div>
+
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Changing..." : "Change Informations"}
+              </Button>
             </form>
           </Form>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Security</CardTitle>
-            <CardDescription>Manage your password and security settings</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
-              <div className="flex items-center gap-2">
-                <Input type="password" value="••••••••" disabled />
-                <Button variant="outline" size="sm">
-                  Change
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Two-Factor Authentication</label>
-              <div className="flex items-center justify-between rounded-md border p-3">
-                <div className="text-sm">Protect your account with two-factor authentication</div>
-                <Button variant="outline" size="sm" disabled>
-                  Enable
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="text-sm text-muted-foreground">
-            Last login: {new Date().toLocaleDateString()}
-          </CardFooter>
-        </Card>
+
       </div>
     </div>
   )

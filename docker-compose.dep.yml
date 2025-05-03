@@ -10,7 +10,7 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=password
-      - MONGO_INITDB_DATABASE=buy01
+      - MONGO_INITDB_DATABASE=book-sen-db
     networks:
       - backend
 

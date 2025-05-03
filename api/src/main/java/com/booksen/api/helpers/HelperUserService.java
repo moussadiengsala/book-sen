@@ -84,15 +84,20 @@ public class HelperUserService {
     }
 
     public Response<Object> updateEntity(User entity, UpdateUserDTO dto) {
-        Optional.ofNullable(dto.getName()).ifPresent(entity::setName);
+        boolean isUpdated = false;
+        if (dto.getName() != null && !dto.getName().trim().isEmpty()) {
+            entity.setName(dto.getName().trim().toLowerCase());
+            isUpdated = true;
+        }
+
         if (dto.getCurrent_password() != null && dto.getNew_password() != null) {
             if (passwordEncoder.matches(dto.getCurrent_password(), entity.getPassword())) {
                 entity.setPassword(passwordEncoder.encode(dto.getNew_password()));
             } else {
                 return Response.badRequest("Previous password does not match");
             }
+            isUpdated = true;
         }
-
 
         // Update avatar if provided
         if (dto.getAvatar() != null) {
@@ -101,7 +106,7 @@ public class HelperUserService {
 
             try {
                 if (entity.getAvatar() != null) {
-                    Response<Object> responseDeleted = fileServices.deleteOldAvatar(entity.getAvatar());
+                    Response<Object> responseDeleted = fileServices.deleteOldImage(entity.getAvatar());
                     if (responseDeleted.getStatus() != HttpStatus.OK.value()) return responseDeleted;
                 }
 
@@ -111,6 +116,11 @@ public class HelperUserService {
             } catch (IOException e) {
                 return new Response<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to process avatar", null);
             }
+            isUpdated = true;
+        }
+
+        if (!isUpdated) {
+            return Response.badRequest("At least one field to update must be provided");
         }
         return null;
     }

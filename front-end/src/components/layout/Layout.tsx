@@ -2,7 +2,7 @@ import { Outlet } from "react-router"
 import { Header } from "./Header"
 import { Sidebar } from "./Sidebar"
 
-export default function DashboardLayout() {
+export default function Layout() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />

@@ -73,7 +73,7 @@ public class FileServices {
 
     private String generateUniqueFilename(MultipartFile file) {
         String sanitizedName = sanitizeFilename(file.getOriginalFilename());
-        String extension = getAvatarExtension(sanitizedName);
+        String extension = getImageExtension(sanitizedName);
         return UUID.randomUUID() + extension;
     }
 
@@ -94,15 +94,15 @@ public class FileServices {
                 .build();
     }
 
-    private String getAvatarExtension(String avatar) {
-        return Optional.ofNullable(avatar)
+    private String getImageExtension(String image) {
+        return Optional.ofNullable(image)
                 .filter(f -> f.contains("."))
                 .map(f -> f.substring(f.lastIndexOf(".")).toLowerCase())
                 .orElse("");
     }
 
-    public Response<Object> deleteOldAvatar(String avatar) throws IOException {
-        Path filePath = Paths.get(baseUploadDirectory).resolve(avatar).normalize();
+    public Response<Object> deleteOldImage(String image) throws IOException {
+        Path filePath = Paths.get(baseUploadDirectory).resolve(image).normalize();
         if (!filePath.startsWith(Paths.get(baseUploadDirectory))) {
             return buildErrorResponse("Invalid file path");
         }
@@ -110,20 +110,20 @@ public class FileServices {
         return null;
     }
 
-    public Response<Object> getAvatar(String avatar) {
+    public Response<Object> getImage(String image) {
         try {
-            if (avatar == null || avatar.isBlank()) {
-                return buildErrorResponse("Invalid avatar image path");
+            if (image == null || image.isBlank()) {
+                return buildErrorResponse("Invalid image path");
             }
 
-            Path filePath = Paths.get(baseUploadDirectory).resolve(avatar).normalize();
+            Path filePath = Paths.get(baseUploadDirectory).resolve(image).normalize();
             if (!filePath.startsWith(Paths.get(baseUploadDirectory))) {
-                return buildErrorResponse("Invalid file path");
+                return buildErrorResponse("Invalid image path");
             }
 
             Resource resource = new UrlResource(filePath.toUri());
             if (!resource.exists() || !resource.isReadable()) {
-                return buildErrorResponse("Avatar file not found");
+                return buildErrorResponse("Image not found");
             }
 
             return Response.<Object>builder()
@@ -132,7 +132,7 @@ public class FileServices {
                     .data(resource)
                     .build();
         } catch (Exception e) {
-            return buildErrorResponse("Failed to retrieve avatar file");
+            return buildErrorResponse("Failed to retrieve the image");
         }
     }
 }

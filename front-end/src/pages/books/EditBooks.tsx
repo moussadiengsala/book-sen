@@ -2,92 +2,131 @@
 
 import { useEffect, useState } from "react"
 import { Link, useParams, useNavigate } from "react-router"
-import { z } from "zod"
+import { z} from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "../../components/ui/button"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "../../components/ui/form"
+import { Form } from "../../components/ui/form"
 import { Input } from "../../components/ui/input"
 import { Textarea } from "../../components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
-import { getBook, getCategories, updateBook } from "../../lib/mock-data"
-import type { Book, Category } from "../../types"
-import { ArrowLeft } from "lucide-react"
-import { useToast } from "../../hooks/use-toast"
+import type { Book } from "../../types"
+import {ArrowLeft, X} from "lucide-react"
+import {useBook, useUpdateBook} from "../../hooks/use-book";
+import {bookFormSchema, bookUpdateFormSchema} from "../../lib/schema";
+import {environment} from "../../lib/environment";
+import {Label} from "../../components/ui/label";
+import {AxiosError} from "axios";
+import Alert from "../../components/Alert";
 
-const bookFormSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  author: z.string().min(1, "Author is required"),
-  description: z.string().min(10, "Description must be at least 10 characters"),
-  categoryId: z.string().min(1, "Category is required"),
-  coverUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-})
 
 type BookFormValues = z.infer<typeof bookFormSchema>
 
 export default function EditBookPage() {
-  const { id } = useParams<{ id: string }>()
+  const { id } = useParams() as { id: string };
   const navigate = useNavigate()
-  const { showToast } = useToast()
+  const { data: fetchedBook, error: fetchError } = useBook(id);
   const [book, setBook] = useState<Book | null>(null)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { mutate: updateBook, isPending, error: errorUpdating } = useUpdateBook();
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null)
 
   const form = useForm<BookFormValues>({
-    resolver: zodResolver(bookFormSchema),
+    resolver: zodResolver(bookUpdateFormSchema),
     defaultValues: {
-      title: "",
+      name: "",
       author: "",
       description: "",
-      categoryId: "",
-      coverUrl: "",
     },
   })
 
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileInput = e.target;
+    if (fileInput.files && fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+
+      // Check file type
+      if (!environment.ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        form.setError("cover", {
+          type: "manual",
+          message: "Only .jpg, .jpeg, .png and .webp formats are supported"
+        });
+        setCoverPreview(null);
+        return;
+      }
+
+      // Check file size
+      if (file.size > environment.MAX_FILE_SIZE) {
+        form.setError("cover", {
+          type: "manual",
+          message: "Max file size is 2MB"
+        });
+        setCoverPreview(null);
+        return;
+      }
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (typeof result === "string") {
+          setCoverPreview(result);
+        }
+      };
+      reader.readAsDataURL(file);
+
+      // Clear any previous errors
+      form.clearErrors("cover");
+    } else {
+      setCoverPreview(null);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (coverPreview && coverPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (fetchError || errorUpdating) {
+      const axiosError = (fetchError || errorUpdating) as AxiosError<{ message?: string }>;
+      const message =
+          axiosError.response?.data?.message ||
+          axiosError.message ||
+          "Something went wrong while processing your request.";
+      setError(message);
+    }
+  }, [fetchError, errorUpdating]);
+
+
   useEffect(() => {
     if (id) {
-      const fetchedBook = getBook(id)
       if (fetchedBook) {
         setBook(fetchedBook)
         form.reset({
-          title: fetchedBook.title,
+          name: fetchedBook.name,
           author: fetchedBook.author,
           description: fetchedBook.description,
-          categoryId: fetchedBook.categoryId,
-          coverUrl: fetchedBook.coverUrl,
         })
+        if (id) {
+          setCoverPreview(`${environment.API_URL}books/cover/${fetchedBook.cover}`)
+        }
       }
-      setCategories(getCategories())
-      setIsLoading(false)
     }
   }, [id, form])
 
-  const onSubmit = (data: BookFormValues) => {
-    try {
-      if (id) {
-        updateBook(id, {
-          ...data,
-          coverUrl: data.coverUrl || "/placeholder.svg?height=400&width=300",
-        })
 
-        showToast({
-          title: "Book updated",
-          description: "Your book has been successfully updated",
-        })
-
-        navigate(`/dashboard/books/${id}`)
-      }
-    } catch (error) {
-      showToast({
-        title: "Error",
-        description: "Failed to update the book",
-        variant: "destructive",
-      })
-    }
-  }
-
-  if (isLoading) {
-    return <div>Loading...</div>
+  const onSubmit = (id: string, data: BookFormValues) => {
+    updateBook(
+        { id, book: data },
+        {
+          onSuccess: () => {
+            navigate(`/books/${id}`)
+          }
+        }
+    );
   }
 
   if (!book) {
@@ -107,9 +146,14 @@ export default function EditBookPage() {
 
   return (
     <div className="space-y-6">
+      {error &&
+          <div className="fixed bottom-4 right-4 z-50">
+            <Alert message={error} type="error" icon={X} />
+          </div>
+      }
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link to={`/dashboard/books/${id}`}>
+          <Link to={`/books/${id}`}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Book
           </Link>
@@ -120,94 +164,63 @@ export default function EditBookPage() {
         <h1 className="text-3xl font-bold tracking-tight">Edit Book</h1>
         <p className="text-muted-foreground">Update book information</p>
       </div>
-
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <div className="grid gap-6 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter book title" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        <form onSubmit={form.handleSubmit((data) => onSubmit(id, data))} className="space-y-8">
 
-            <FormField
-              control={form.control}
-              name="author"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Author</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter author name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="coverUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cover Image URL</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter cover image URL (optional)" {...field} />
-                  </FormControl>
-                  <FormDescription>Leave empty to use a placeholder image</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input id="name" placeholder="Enter your name" {...form.register("name")} />
+            {form.formState.errors.name && (
+                <p className="text-sm text-red-500 text-left">{form.formState.errors.name.message}</p>
+            )}
           </div>
 
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Description</FormLabel>
-                <FormControl>
-                  <Textarea placeholder="Enter book description" className="min-h-[120px]" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+          <div className="space-y-2">
+            <Label htmlFor="author">author</Label>
+            <Input id="author" placeholder="Enter your author" {...form.register("author")} />
+            {form.formState.errors.author && (
+                <p className="text-sm text-red-500 text-left">{form.formState.errors.author.message}</p>
             )}
-          />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="description">description</Label>
+            <Textarea id="description" placeholder="Enter your description" {...form.register("description")} />
+            {form.formState.errors.description && (
+                <p className="text-sm text-red-500 text-left">{form.formState.errors.description.message}</p>
+            )}
+          </div>
 
-          <Button type="submit">Update Book</Button>
+          <div className="space-y-2">
+            <Label htmlFor="avatar">Profile Picture (Optional)</Label>
+            <Input
+                id="avatar"
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                {...form.register("cover", {
+                  onChange: handleCoverChange
+                })}
+            />
+            {form.formState.errors.cover && (
+                <p className="text-sm text-red-500 text-left">{form.formState.errors.cover.message?.toString()}</p>
+            )}
+
+            {/* Preview */}
+            {coverPreview && (
+                <div className="mt-2 flex justify-center">
+                  <div className="relative w-24 h-24 overflow-hidden rounded-full border-2 border-gray-200">
+                    <img
+                        src={coverPreview}
+                        alt="Avatar preview"
+                        className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+            )}
+          </div>
+
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "Upating..." : "Update Book"}
+          </Button>
         </form>
       </Form>
     </div>

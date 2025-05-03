@@ -2,65 +2,39 @@ package com.booksen.api.helpers;
 
 import com.booksen.api.books.Books;
 import com.booksen.api.books.BooksRepository;
-import com.booksen.api.category.CategoryRepository;
 import com.booksen.api.dto.books.BookResponseDTO;
 import com.booksen.api.dto.books.CreateUpdateBookDTO;
-import com.booksen.api.model.EntityHelper;
-import com.booksen.api.model.ResourceNotFoundException;
+import com.booksen.api.dto.user.CreateUserDTO;
 import com.booksen.api.model.Response;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
-public class BooksHelper implements EntityHelper<Books, String, CreateUpdateBookDTO, BookResponseDTO> {
+public class BooksHelper {
 
     private final BooksRepository booksRepository;
-    private final CategoryRepository categoryRepository;
-    private final Validator validator;
+    private final FileServices fileServices;
 
-    @Override
     public void prepareForValidation(CreateUpdateBookDTO dto) {
         Optional.ofNullable(dto.getName())
                 .ifPresent(name -> dto.setName(name.toLowerCase()));
     }
 
-    @Override
-    public Map<Integer, List<String>> validate(List<CreateUpdateBookDTO> dtos) {
-        Map<Integer, List<String>> errors = new HashMap<>();
-
-        for (int i = 0; i < dtos.size(); i++) {
-            CreateUpdateBookDTO dto = dtos.get(i);
-            List<String> errorMessages = new ArrayList<>();
-
-            // Validate categories existence
-            if (dto.getCategory() != null) {
-                if (!categoryRepository.existsById(dto.getCategory().getId())) {
-                    errorMessages.add("Category with ID " + dto.getCategory().getId() + " does not exist");
-                }
-            }
-
-            // Validate constraints (default method)
-            Map<Integer, List<String>> validationErrors = validateEntities(dtos, validator);
-            if (!validationErrors.isEmpty()) {
-                errorMessages.addAll(validationErrors.getOrDefault(i, List.of()));
-            }
-
-            if (!errorMessages.isEmpty()) {
-                errors.put(i, errorMessages);
-            }
-        }
-
-        return errors;
+    public Response<Object> createBookValidation(CreateUpdateBookDTO dto) {
+        prepareForValidation(dto);
+        if (booksRepository.findBooksByName(dto.getName()).isPresent()) return Response.badRequest("Book already exists.");
+        return this.processCover(dto.getCover());
     }
 
-    @Override
     public Set<String> findExistingNames(List<CreateUpdateBookDTO> dtos) {
         Set<String> namesToCheck = dtos.stream()
                 .map(CreateUpdateBookDTO::getName)
@@ -71,30 +45,29 @@ public class BooksHelper implements EntityHelper<Books, String, CreateUpdateBook
                 .collect(Collectors.toSet());
     }
 
-    @Override
     public BookResponseDTO toResponseEntity(Books book) {
         return BookResponseDTO.builder()
                 .id(book.getId())
                 .name(book.getName())
                 .description(book.getDescription())
                 .author(book.getAuthor())
-                .coverUrl(book.getCover()) // Or generate full URL if needed
-                .categoryName(book.getCategory().getName())
-                .category(book.getCategory())
+                .cover(book.getCover())
                 .createdAt(book.getCreatedAt())
                 .updatedAt(book.getUpdatedAt())
                 .build();
     }
 
-    @Override
-    public Books toEntity(CreateUpdateBookDTO dto) {
+    public Books toEntity(CreateUpdateBookDTO dto, String cover) {
         return Books.builder()
                 .name(dto.getName())
+                .author(dto.getAuthor())
                 .description(dto.getDescription())
+                .cover(cover)
+                .updatedAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
                 .build();
     }
 
-    @Override
     public Response<Object> findExistingNameOnUpdate(String id, CreateUpdateBookDTO dto) {
         Optional<Books> entityWithSameName = booksRepository.findByName(dto.getName());
         if (entityWithSameName.isPresent() && !entityWithSameName.get().getId().equals(id)) {
@@ -104,18 +77,61 @@ public class BooksHelper implements EntityHelper<Books, String, CreateUpdateBook
         return null;
     }
 
-    @Override
-    public void updateEntity(Books entity, CreateUpdateBookDTO updateDTO) {
-        Optional.ofNullable(updateDTO.getName()).ifPresent(entity::setName);
-        Optional.ofNullable(updateDTO.getDescription()).ifPresent(entity::setDescription);
+    public Response<Object> updateEntity(Books entity, CreateUpdateBookDTO updateDTO) {
+        boolean isUpdated = false;
 
-        Optional.ofNullable(updateDTO.getCategory()).ifPresent(category -> {
-            categoryRepository.findById(category.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + category.getName()))
-                    .getId();
-            entity.setCategory(category);
-        });
+        if (updateDTO.getName() != null && !updateDTO.getName().isEmpty()) {
+            entity.setName(updateDTO.getName());
+            isUpdated = true;
+        }
 
-        entity.setUpdatedAt(LocalDateTime.now()); // Update timestamp
+        if (updateDTO.getDescription() != null && !updateDTO.getDescription().isEmpty()) {
+            entity.setDescription(updateDTO.getDescription());
+            isUpdated = true;
+        }
+
+        if (updateDTO.getCover() != null && !updateDTO.getCover().isEmpty()) {
+            Response<Object> response = this.processCover(updateDTO.getCover());
+            if (response.getData() != null) return response;
+
+            try {
+                if (entity.getCover() != null) {
+                    Response<Object> responseDeleted = fileServices.deleteOldImage(entity.getCover());
+                    if (responseDeleted.getStatus() != HttpStatus.OK.value()) return responseDeleted;
+                }
+
+                // Set the new avatar URL
+                String avatarUrl = (String) response.getData();
+                entity.setCover(avatarUrl);
+            } catch (IOException e) {
+                return new Response<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to process avatar", null);
+            }
+        }
+
+        if (!isUpdated) {
+            return Response.badRequest("You need to provide data to update the book");
+        }
+
+        entity.setUpdatedAt(LocalDateTime.now());
+        return null;
+    }
+
+    private Response<Object> processCover(MultipartFile cover) {
+        if (cover == null || cover.isEmpty()) return null;
+
+        try {
+            Response<Object> fileValidationResponse = fileServices.validateFile(cover);
+            if (fileValidationResponse != null) {
+                return fileValidationResponse;
+            }
+
+            return new Response<Object>(HttpStatus.OK.value(), fileServices.saveFile(cover), "");
+        } catch (Exception e) {
+            return Response.<Object>builder()
+                    .status(HttpStatus.BAD_REQUEST.value())
+                    .data(null)
+                    .message(e.getMessage())
+                    .build();
+        }
     }
 }

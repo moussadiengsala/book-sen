@@ -1,13 +1,19 @@
 export interface Book {
     id: string
-    title: string
+    name: string
     description: string
     author: string
-    categoryId: string
-    coverUrl: string
+    cover: string
     createdAt: string
     updatedAt: string
 }
+
+export type CreateBook = {
+    name: string;
+    description: string;
+    author: string;
+    cover: File | null | undefined;
+};
   
 export interface Category {
     id: string
@@ -38,10 +44,9 @@ export interface LoginUser {
 }
 
 export interface UpdateUser {
-    name: string
+    name?: string
     current_password?: string
     new_password?: string
-    role?: "ADMIN" | "USER"
     avatar?: File
 }
 

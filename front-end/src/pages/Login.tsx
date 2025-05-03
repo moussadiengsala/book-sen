@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Link, useLocation, useNavigate } from "react-router"
+import { Link, useNavigate } from "react-router"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -11,14 +11,9 @@ import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { useAuth } from "../lib/auth-provider"
 import {AxiosError} from "axios";
+import {loginSchema} from "../lib/schema";
 
-const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email"),
-  password: z.string()
-      .min(8, "Password must be at least 8 characters")
-      .regex(/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/,
-          "Password must contain at least one uppercase, one lowercase, one number, and one special character"),
-})
+
 
 type LoginFormValues = z.infer<typeof loginSchema>
 type LoginToast = {
@@ -32,7 +27,6 @@ export default function LoginPage() {
   const [loginToast, setLoginToast] = useState<LoginToast>(null);
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
-  const location = useLocation()
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -52,9 +46,8 @@ export default function LoginPage() {
         message: "You have been logged in"
       });
 
-      // Redirect to the page they were trying to access or dashboard
-      const from = location.state?.from?.pathname || "/dashboard"
-      navigate(from)
+      console.log("hello")
+      navigate("/books")
     } catch (error) {
       const err = error as AxiosError<{ message?: string }>;
       setLoginToast({

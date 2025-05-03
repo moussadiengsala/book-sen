@@ -1,54 +1,58 @@
-# React + TypeScript + Vite
+# BookSen Front End - Système de Gestion de Livres et Utilisateurs
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Description
+Ce frontend React permet aux utilisateurs de gérer une collection de livres, avec des fonctionnalités d'authentification, de gestion de profil et d'administration des livres.
 
-Currently, two official plugins are available:
+## Technologies utilisées
+- React 18
+- React Router v6
+- TanStack Query (anciennement React Query)
+- Context API pour la gestion d'état
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Structure de l'application
 
-## Expanding the ESLint configuration
+### Routes principales
+- `/` : Page d'accueil publique
+- `/login` : Connexion utilisateur
+- `/register` : Inscription utilisateur
+- `/books` : Liste des livres (protégée)
+- `/books/new` : Création d'un livre (admin seulement)
+- `/books/:id` : Détails d'un livre
+- `/books/:id/edit` : Édition d'un livre (admin seulement)
+- `/profile` : Profil utilisateur (protégée)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Composants clés
+- `AuthProvider` : Gère l'état d'authentification
+- `ProtectedRoute` : Restreint l'accès aux utilisateurs connectés
+- `AdminRoute` : Restreint l'accès aux administrateurs
+- `Layout` : Structure commune de l'application
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+### Gestion des livres
+Le frontend utilise TanStack Query pour:
+- Récupérer la liste des livres (`useBooks`)
+- Obtenir un livre spécifique (`useBook`)
+- Créer un nouveau livre (`useCreateBook`)
+- Mettre à jour un livre (`useUpdateBook`)
+- Supprimer un livre (`useDeleteBook`)
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+## Installation
+1. Cloner le dépôt:
+   ```bash
+   git clone https://github.com/moussadiengsala/book-sen.git
+   cd book-sen
+   ```
+   
+2. Run
+- with docker
+    ```bash
+    docker-compose -f docker-compose.service.yml up -d --build book-sen-front
+    ```
+- or
+    ```bash
+    cd front-end 
+    npm install
+    ```
+3. Vous pouvez maintenant aller a:
+   ```bash
+   localhost:5173
+   ```

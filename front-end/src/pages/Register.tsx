@@ -12,44 +12,8 @@ import { Label } from "../components/ui/label"
 import { useAuth } from "../lib/auth-provider"
 import {environment} from "../lib/environment";
 import {AxiosError} from "axios";
+import {registerSchema} from "../lib/schema";
 
-
-const registerSchema = z.object({
-  name: z.string()
-      .min(2, "Name must be between 2 and 20 characters")
-      .max(20, "Name must be between 2 and 20 characters")
-      .regex(/^[A-Za-zÀ-ÿ\s'-]+$/, "Name can only contain letters, spaces, hyphens, and apostrophes"),
-  email: z.string().email("Please enter a valid email"),
-  password: z.string()
-      .min(8, "Password must be at least 8 characters")
-      .regex(/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/,
-          "Password must contain at least one uppercase, one lowercase, one number, and one special character"),
-  confirmPassword: z.string(),
-  avatar: z
-      .any()
-      .optional()
-      .refine((files) => {
-        if (!files || !(files instanceof FileList) || files.length === 0) return true;
-        return files.length === 1;
-      }, "Please upload only one file")
-      .refine((files) => {
-        if (!files || !(files instanceof FileList) || files.length === 0) return true;
-        const file = files.item(0);
-        return !!file && file.size <= environment.MAX_FILE_SIZE;
-      }, `Max file size is 2MB`)
-      .refine((files) => {
-        if (!files || !(files instanceof FileList) || files.length === 0) return true;
-        const file = files.item(0);
-        return !!file && environment.ACCEPTED_IMAGE_TYPES.includes(file.type);
-      }, "Only .jpg, .jpeg, .png and .webp formats are supported")
-      .transform((files) => {
-        if (!files || !(files instanceof FileList) || files.length === 0) return undefined;
-        return files.item(0) ?? undefined;
-      })
-}).refine(data => data.password === data.confirmPassword, {
-  message: "Passwords must match",
-  path: ["confirmPassword"],
-});
 
 type RegisterFormValues = z.infer<typeof registerSchema>
 

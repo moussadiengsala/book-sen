@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Link, useParams, useNavigate } from "react-router"
+import {Link, useParams, useNavigate} from "react-router"
 import { Button } from "../../components/ui/button"
 import {
   AlertDialog,
@@ -15,45 +15,55 @@ import {
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog"
 import { useAuth } from "../../lib/auth-provider"
-import { deleteBook, getBook, getCategoryName } from "../../lib/mock-data"
 import type { Book } from "../../types"
-import { ArrowLeft, Calendar, Edit, Trash } from "lucide-react"
-import { useToast } from "../../hooks/use-toast"
+import {ArrowLeft, BookIcon, Calendar, Edit, Trash, X} from "lucide-react"
+import {useBook, useDeleteBook} from "../../hooks/use-book";
+import {AxiosError} from "axios";
+import {environment} from "../../lib/environment";
+import Alert from "../../components/Alert";
 
 export default function BookDetailsPage() {
-  const { id } = useParams<{ id: string }>()
+  const { id } = useParams() as { id: string };
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { showToast } = useToast()
+  const { data: fetchedBook, error: fetchError } = useBook(id);
+  const { mutate: deleteBookMutation, error: errorDelete, isPending: isDeleting } = useDeleteBook();
   const [book, setBook] = useState<Book | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log(fetchedBook)
     if (id) {
-      const fetchedBook = getBook(id)
       if (fetchedBook) {
         setBook(fetchedBook)
       }
       setIsLoading(false)
     }
-  }, [id])
+  }, [id, fetchedBook])
+
+
+  useEffect(() => {
+    if (fetchError || errorDelete) {
+      const axiosError = (fetchError || errorDelete) as AxiosError<{ message?: string }>;
+      const message =
+          axiosError.response?.data?.message ||
+          axiosError.message ||
+          "Something went wrong while processing your request.";
+      setError(message);
+    }
+  }, [fetchError, errorDelete]);
 
   const handleDelete = () => {
     if (id) {
-      const success = deleteBook(id)
-      if (success) {
-        showToast({
-          title: "Book deleted",
-          description: "The book has been successfully deleted",
-        })
-        navigate("/dashboard/books")
-      } else {
-        showToast({
-          title: "Error",
-          description: "Failed to delete the book",
-          variant: "destructive",
-        })
-      }
+      deleteBookMutation(id, {
+        onSuccess: () => {
+          navigate("/books");
+        },
+        onError: () => {
+          setError("Failed to delete the book.");
+        },
+      });
     }
   }
 
@@ -78,9 +88,14 @@ export default function BookDetailsPage() {
 
   return (
     <div className="space-y-6">
+      {error &&
+          <div className="fixed bottom-4 right-4 z-50">
+            <Alert message={error} type="error" icon={X} />
+          </div>
+      }
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/dashboard/books">
+          <Link to="/books">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Link>
@@ -89,16 +104,13 @@ export default function BookDetailsPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="aspect-[3/4] w-full max-w-md overflow-hidden rounded-lg">
-          <img src={book.coverUrl || "/placeholder.svg"} alt={book.title} className="h-full w-full object-cover" />
+          <img src={`${environment.API_URL}books/cover/${book.cover}`} alt={book.name} className="h-full w-full object-cover" />
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 text-left">
           <div>
-            <div className="inline-block rounded-md bg-primary/10 px-3 py-1 text-sm text-primary">
-              {getCategoryName(book.categoryId)}
-            </div>
-            <h1 className="mt-2 text-3xl font-bold">{book.title}</h1>
-            <p className="text-xl text-muted-foreground">by {book.author}</p>
+            <h1 className="mt-2 text-3xl font-bold capitalize">{book.name}</h1>
+            <p className="text-xl text-muted-foreground capitalize">by {book.author}</p>
           </div>
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -118,11 +130,19 @@ export default function BookDetailsPage() {
             <h3 className="text-lg font-semibold">Description</h3>
             <p className="mt-2 text-muted-foreground">{book.description}</p>
           </div>
+          <div>
+            <Button asChild>
+              <Link to={`#`}>
+                <BookIcon className="mr-2 h-4 w-4" />
+                Lend This Book
+              </Link>
+            </Button>
+          </div>
 
-          {user && (
+          {user && user.role == "ADMIN" && (
             <div className="flex gap-4 pt-6">
               <Button asChild>
-                <Link to={`/dashboard/books/${book.id}/edit`}>
+                <Link to={`/books/${book.id}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
                   Edit
                 </Link>
@@ -142,10 +162,16 @@ export default function BookDetailsPage() {
                       This action cannot be undone. This will permanently delete the book from your collection.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-                  </AlertDialogFooter>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel asChild>
+                          <button className="px-4 py-2 rounded text-white">Cancel</button>
+                        </AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} asChild>
+                          <button className="px-4 py-2 rounded text-red-500">
+                            {isDeleting ? "Deleting..." : "Delete"}
+                          </button>
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             </div>

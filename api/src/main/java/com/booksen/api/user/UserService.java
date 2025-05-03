@@ -56,7 +56,7 @@ public class UserService {
     }
 
     public Response<Object> getUserAvatar(String filename) {
-        return fileServices.getAvatar(filename);
+        return fileServices.getImage(filename);
     }
 
     public Response<Object> authenticate(LoginUserDTO loginRequest) {
@@ -102,30 +102,5 @@ public class UserService {
                 .map(helperUserService::toResponseUserDTO)
                 .collect(Collectors.toList());
         return Response.ok(users, "Success");
-    }
-
-    public Response<Object> updateRole(String id, Role role) {
-        User targetUser = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        if (!(role == Role.USER || role == Role.ADMIN) || targetUser.getRole() == role) {
-            return Response.badRequest("Invalid role or same role as target user.");
-        }
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser = (User) authentication.getPrincipal();
-
-        if (!currentUser.getRole().equals(Role.ADMIN)) {
-            throw new AccessDeniedException("Only admins can update user roles");
-        }
-
-        if (currentUser.getId().equals(targetUser.getId())) {
-            throw new IllegalStateException("Users cannot modify their own role");
-        }
-
-        targetUser.setRole(role);
-        User updatedUser = userRepository.save(targetUser);
-
-        return Response.ok(helperUserService.toResponseUserDTO(updatedUser), "user role has been updated successfully.");
     }
 }

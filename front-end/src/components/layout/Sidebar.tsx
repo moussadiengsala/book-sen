@@ -1,46 +1,27 @@
 "use client"
 
 import { Link, useLocation } from "react-router"
-import { useAuth } from "../../lib/auth-provider"
 import { cn } from "../../lib/utils"
-import { BookOpen, Grid, Layers, User } from "lucide-react"
+import { BookOpen, User } from "lucide-react"
 
 export function Sidebar() {
-  const { user } = useAuth()
   const location = useLocation()
   const pathname = location.pathname
 
   const routes = [
     {
-      label: "Dashboard",
-      icon: Grid,
-      href: "/dashboard",
-      active: pathname === "/dashboard",
-    },
-    {
       label: "Books",
       icon: BookOpen,
-      href: "/dashboard/books",
+      href: "/books",
       active: pathname.includes("/books"),
     },
     {
       label: "Profile",
       icon: User,
-      href: "/dashboard/profile",
-      active: pathname === "/dashboard/profile",
+      href: "/profile",
+      active: pathname === "/profile",
     },
   ]
-
-  // Admin-only routes
-  if (user?.role === "admin") {
-    routes.push({
-      label: "Categories",
-      icon: Layers,
-      href: "/dashboard/categories",
-      active: pathname.includes("/categories"),
-    })
-  }
-
   return (
     <div className="hidden border-r bg-gray-50/40 md:block dark:bg-gray-800/40 w-64">
       <div className="flex h-full flex-col gap-2 p-4">

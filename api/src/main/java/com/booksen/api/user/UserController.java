@@ -59,14 +59,6 @@ public class UserController {
         return ResponseEntity.status(response.getStatus()).body(response);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/admin/update-role/{id}")
-    public ResponseEntity<Response<Object>> updateUserRole(@PathVariable String id, @RequestBody Role role) {
-        Response<Object> response = userService.updateRole(id, role);
-        return ResponseEntity.status(response.getStatus()).body(response);
-    }
-
-
     @PostMapping("/auth/login")
     public ResponseEntity<Response<Object>> authenticate(@Valid @RequestBody LoginUserDTO user) {
         Response<Object> response = userService.authenticate(user);
@@ -74,10 +66,10 @@ public class UserController {
     }
 
     @PreAuthorize("#id == authentication.principal.id")
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Response<Object>> updateUser(
             @PathVariable String id,
-            @Valid @ModelAttribute UpdateUserDTO updateUserDTO
+            @ModelAttribute UpdateUserDTO updateUserDTO
             ) {
         Response<Object> updatedUser = userService.updateUser(id, updateUserDTO);
         return ResponseEntity.status(updatedUser.getStatus()).body(updatedUser);

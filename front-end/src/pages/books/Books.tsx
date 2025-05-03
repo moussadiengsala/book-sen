@@ -1,49 +1,62 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Link } from "react-router"
+import {Link, useSearchParams} from "react-router"
 import { Button } from "../../components/ui/button"
 import { Card, CardContent } from "../../components/ui/card"
 import { Input } from "../../components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 import { useAuth } from "../../lib/auth-provider"
-import { getBooks, getCategories, getCategoryName } from "../../lib/mock-data"
-import type { Book, Category } from "../../types"
-import { BookOpen, Plus, Search } from "lucide-react"
+import type { Book } from "../../types"
+import {BookOpen, Plus, Search, X} from "lucide-react"
+import {useBooks} from "../../hooks/use-book";
+import Alert from "../../components/Alert";
+import {AxiosError} from "axios";
+import {environment} from "../../lib/environment";
 
 export default function BooksPage() {
-  const { user } = useAuth()
-  const [books, setBooks] = useState<Book[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const { user } = useAuth();
+  const { data: books, error: fetchError } = useBooks();
+  const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [error, setError] = useState<string | null>(searchParams.get("error"));
 
   useEffect(() => {
-    setBooks(getBooks())
-    setCategories(getCategories())
-  }, [])
+    if (fetchError) {
+      const err = fetchError as AxiosError<{ message?: string }>;
+      setError(err.response?.data?.message || "Failed to fetch books");
+    }
+  }, [fetchError]);
 
-  const filteredBooks = books.filter((book) => {
-    const matchesSearch =
-      book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      book.description.toLowerCase().includes(searchTerm.toLowerCase())
+  useEffect(() => {
+    if (!books) return;
 
-    const matchesCategory = selectedCategory === "all" || book.categoryId === selectedCategory
+    const filtered = books.filter((book: Book) => {
+      const lowerTerm = searchTerm.trim().toLowerCase();
+      return (
+          book.name.toLowerCase().includes(lowerTerm) ||
+          book.author.toLowerCase().includes(lowerTerm)
+      );
+    });
 
-    return matchesSearch && matchesCategory
-  })
+    setFilteredBooks(filtered);
+  }, [searchTerm, books]);
 
   return (
     <div className="space-y-6">
+      {error &&
+          <div className="fixed bottom-4 right-4 z-50">
+            <Alert message={error} type="error" icon={X} />
+          </div>
+      }
       <div className="flex items-center justify-between">
-        <div>
+        <div className="text-left">
           <h1 className="text-3xl font-bold tracking-tight">Books</h1>
           <p className="text-muted-foreground">Browse and manage your book collection</p>
         </div>
-        {user && (
+        {user && user.role == "ADMIN" && (
           <Button asChild>
-            <Link to="/dashboard/books/new">
+            <Link to="/books/new">
               <Plus className="mr-2 h-4 w-4" />
               Add Book
             </Link>
@@ -64,39 +77,24 @@ export default function BooksPage() {
             />
           </div>
         </div>
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((category) => (
-              <SelectItem key={category.id} value={category.id}>
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredBooks.length > 0 ? (
           filteredBooks.map((book) => (
-            <Link key={book.id} to={`/dashboard/books/${book.id}`}>
+            <Link key={book.id} to={`/books/${book.id}`}>
               <Card className="overflow-hidden transition-all hover:shadow-md">
                 <div className="aspect-[3/4] w-full relative">
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
                   <img
-                    src={book.coverUrl || "/placeholder.svg"}
-                    alt={book.title}
+                    src={`${environment.API_URL}books/cover/${book.cover}`}
+                    alt={book.name}
                     className="h-full w-full object-cover"
                   />
-                  <div className="absolute bottom-2 left-2 z-20 rounded-md bg-black/70 px-2 py-1 text-xs text-white">
-                    {getCategoryName(book.categoryId)}
-                  </div>
+
                 </div>
                 <CardContent className="p-4">
-                  <h3 className="font-semibold line-clamp-1">{book.title}</h3>
+                  <h3 className="font-semibold line-clamp-1">{book.name}</h3>
                   <p className="text-sm text-muted-foreground">{book.author}</p>
                 </CardContent>
               </Card>
